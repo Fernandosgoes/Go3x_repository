@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HookShot</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h2><img src="icons/title-icon.png" width="24" height="24" style="vertical-align: middle; margin-right: 8px;">HookShot</h2>
+        </header>
+        
+        <form id="webhookForm" class="form-section">
+            <div class="input-group">
+                <label for="webhookName">Nome:</label>
+                <input type="text" id="webhookName" placeholder="Digite um nome para o webhook" maxlength="30">
+            </div>
+            
+            <div class="input-group">
+                <label for="webhookUrl">URL do Webhook:</label>
+                <input type="url" id="webhookUrl" placeholder="https://hook.make.com/...">
+            </div>
+            
+            <button type="submit" id="saveBtn" class="save-btn">Salvar Webhook</button>
+        </form>
+        
+        <div id="notification" class="notification hidden"></div>
+        
+        <div class="webhooks-section">
+            <h3>Webhooks Salvos</h3>
+            <div id="webhooksList" class="webhooks-list">
+                <div class="empty-state">
+                    <p>Nenhum webhook configurado</p>
+                    <small>Configure seu primeiro webhook acima</small>
+                </div>
+            </div>
+            <div class="limit-info">
+                <span id="webhookCount">0/3 webhooks</span>
+            </div>
+        </div>
+        
+        <div class="author-section">
+            <div class="author-info">
+                <span class="author-text">Desenvolvido por</span>
+                <span class="author-name">Fernando Goes</span>
+            </div>
+            <div class="social-links">
+                <a href="#" class="social-link" id="linkedinLink" title="LinkedIn">
+                    <img src="icons/linkedin.png" alt="LinkedIn" class="social-icon">
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <script src="popup.js"></script>
+</body>
+</html>

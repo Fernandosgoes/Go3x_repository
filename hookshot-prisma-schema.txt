@@ -1,0 +1,274 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Chrome extension data
+  chromeExtensionId String? @unique
+  lastActiveAt      DateTime?
+
+  // Relationships
+  webhooks    Webhook[]
+  submissions Submission[]
+  sessions    UserSession[]
+
+  @@map("users")
+}
+
+model Webhook {
+  id          String   @id @default(cuid())
+  name        String
+  url         String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // User relationship
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Configuration
+  timeout        Int     @default(10000) // milliseconds
+  maxRetries     Int     @default(3)
+  retryBackoff   Int     @default(1000) // base delay in ms
+  customHeaders  Json?   // { "Authorization": "Bearer token" }
+  payloadTemplate Json? // Custom payload structure
+
+  // Analytics
+  totalSubmissions  Int @default(0)
+  successfulSends   Int @default(0)
+  failedSends       Int @default(0)
+  lastUsedAt        DateTime?
+  avgResponseTimeMs Int?
+
+  // Relationships
+  submissions Submission[]
+  logs        WebhookLog[]
+
+  @@unique([userId, name])
+  @@map("webhooks")
+}
+
+model Submission {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  // User and webhook
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  webhookId String
+  webhook   Webhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  // Content data
+  selectedText String
+  selectedHtml String?
+  images       Json?   // Array of image objects
+  pageUrl      String
+  pageTitle    String
+  timestamp    DateTime
+
+  // Processing status
+  status        SubmissionStatus @default(PENDING)
+  attempts      Int              @default(0)
+  lastAttemptAt DateTime?
+  errorMessage  String?
+  responseCode  Int?
+  responseTime  Int? // milliseconds
+
+  // Metadata
+  userAgent    String?
+  browserInfo  Json?   // Chrome version, OS, etc
+  extensionVersion String?
+
+  // Relationships
+  logs WebhookLog[]
+
+  @@map("submissions")
+}
+
+model WebhookLog {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  // References
+  webhookId    String
+  webhook      Webhook     @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  submissionId String?
+  submission   Submission? @relation(fields: [submissionId], references: [id], onDelete: SetNull)
+
+  // Log data
+  level       LogLevel @default(INFO)
+  event       String   // "SEND_ATTEMPT", "SUCCESS", "ERROR", "TIMEOUT"
+  message     String
+  metadata    Json?    // Additional context data
+  attempt     Int?     // Retry attempt number
+  responseCode Int?
+  responseTime Int?    // milliseconds
+  errorDetails String?
+
+  @@map("webhook_logs")
+}
+
+model UserSession {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Session data
+  sessionToken String @unique
+  refreshToken String @unique
+  userAgent    String?
+  ipAddress    String?
+  lastActiveAt DateTime @default(now())
+
+  @@map("user_sessions")
+}
+
+model SystemMetric {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  // Metric data
+  metricName  String
+  metricValue Float
+  tags        Json?    // { "version": "1.1.0", "environment": "production" }
+  timestamp   DateTime @default(now())
+
+  @@index([metricName, timestamp])
+  @@map("system_metrics")
+}
+
+// Configuration table for system-wide settings
+model AppConfig {
+  id    String @id @default(cuid())
+  key   String @unique
+  value Json
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("app_config")
+}
+
+// Enums
+enum SubmissionStatus {
+  PENDING
+  PROCESSING
+  SUCCESS
+  FAILED
+  TIMEOUT
+  RETRYING
+}
+
+enum LogLevel {
+  DEBUG
+  INFO
+  WARN
+  ERROR
+  FATAL
+}
+
+// Indexes for performance
+// These improve query performance for common operations
+
+// User lookups
+@@index([User.chromeExtensionId])
+@@index([User.email])
+
+// Webhook operations
+@@index([Webhook.userId, Webhook.isActive])
+@@index([Webhook.lastUsedAt])
+
+// Submission tracking
+@@index([Submission.userId, Submission.createdAt])
+@@index([Submission.webhookId, Submission.status])
+@@index([Submission.status, Submission.createdAt])
+
+// Log analysis
+@@index([WebhookLog.webhookId, WebhookLog.createdAt])
+@@index([WebhookLog.level, WebhookLog.createdAt])
+@@index([WebhookLog.event, WebhookLog.createdAt])
+
+// Session management
+@@index([UserSession.userId, UserSession.expiresAt])
+@@index([UserSession.sessionToken])
+
+// Views for common queries (PostgreSQL specific)
+// These would be created via migrations, not in the schema file directly
+
+/*
+-- View for webhook analytics
+CREATE VIEW webhook_analytics AS
+SELECT 
+  w.id,
+  w.name,
+  w.url,
+  w.userId,
+  w.totalSubmissions,
+  w.successfulSends,
+  w.failedSends,
+  CASE 
+    WHEN w.totalSubmissions > 0 
+    THEN (w.successfulSends::float / w.totalSubmissions * 100)::numeric(5,2)
+    ELSE 0
+  END as success_rate,
+  w.avgResponseTimeMs,
+  w.lastUsedAt,
+  COUNT(s.id) as submissions_last_30_days
+FROM webhooks w
+LEFT JOIN submissions s ON w.id = s.webhookId 
+  AND s.createdAt >= NOW() - INTERVAL '30 days'
+GROUP BY w.id, w.name, w.url, w.userId, w.totalSubmissions, 
+         w.successfulSends, w.failedSends, w.avgResponseTimeMs, w.lastUsedAt;
+
+-- View for user activity summary
+CREATE VIEW user_activity_summary AS
+SELECT 
+  u.id,
+  u.email,
+  u.name,
+  COUNT(DISTINCT w.id) as total_webhooks,
+  COUNT(DISTINCT CASE WHEN w.isActive THEN w.id END) as active_webhooks,
+  COUNT(s.id) as total_submissions,
+  COUNT(CASE WHEN s.status = 'SUCCESS' THEN 1 END) as successful_submissions,
+  MAX(s.createdAt) as last_submission_at,
+  u.lastActiveAt
+FROM users u
+LEFT JOIN webhooks w ON u.id = w.userId
+LEFT JOIN submissions s ON u.id = s.userId
+GROUP BY u.id, u.email, u.name, u.lastActiveAt;
+
+-- View for error analysis
+CREATE VIEW error_analysis AS
+SELECT 
+  DATE_TRUNC('day', wl.createdAt) as error_date,
+  w.name as webhook_name,
+  wl.responseCode,
+  wl.errorDetails,
+  COUNT(*) as error_count,
+  AVG(wl.responseTime) as avg_response_time
+FROM webhook_logs wl
+JOIN webhooks w ON wl.webhookId = w.id
+WHERE wl.level = 'ERROR'
+  AND wl.createdAt >= NOW() - INTERVAL '7 days'
+GROUP BY DATE_TRUNC('day', wl.createdAt), w.name, wl.responseCode, wl.errorDetails
+ORDER BY error_date DESC, error_count DESC;
+*/

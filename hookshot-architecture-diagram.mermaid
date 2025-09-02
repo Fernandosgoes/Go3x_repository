@@ -1,0 +1,66 @@
+graph TB
+    subgraph "Chrome Browser Environment"
+        subgraph "HookShot Extension"
+            P[Popup Interface<br/>popup.html/js/css<br/>Configuração de Webhooks]
+            B[Background Script<br/>background.js<br/>Service Worker]
+            C[Content Script<br/>content.js<br/>Captura de Conteúdo]
+        end
+        
+        subgraph "Chrome APIs"
+            S[Storage API<br/>chrome.storage.local]
+            M[Context Menus API<br/>chrome.contextMenus]
+            T[Tabs API<br/>chrome.tabs]
+            N[Notifications API<br/>chrome.notifications]
+            SC[Scripting API<br/>chrome.scripting]
+        end
+        
+        subgraph "Web Pages"
+            W1[Website A<br/>Conteúdo Selecionado]
+            W2[Website B<br/>HTML + Imagens]
+            W3[Website C<br/>Texto + Metadados]
+        end
+    end
+    
+    subgraph "External Services"
+        H1[Make.com<br/>Webhook Endpoint]
+        H2[Zapier<br/>Webhook Endpoint]
+        H3[Custom API<br/>Webhook Endpoint]
+    end
+    
+    U[Usuário] --> P
+    U --> W1
+    U --> W2
+    U --> W3
+    
+    P -->|Salva Configurações| B
+    B -->|Persiste Dados| S
+    B -->|Cria Menus| M
+    B -->|Envia Notificações| N
+    B -->|Gerencia Abas| T
+    B -->|Injeta Scripts| SC
+    
+    SC -.->|Injeta quando necessário| C
+    C -->|Executa em| W1
+    C -->|Executa em| W2
+    C -->|Executa em| W3
+    
+    C -->|Conteúdo Capturado| B
+    M -->|Clique Direito| W1
+    M -->|Clique Direito| W2
+    M -->|Clique Direito| W3
+    
+    B -->|HTTP POST<br/>JSON Payload| H1
+    B -->|HTTP POST<br/>JSON Payload| H2
+    B -->|HTTP POST<br/>JSON Payload| H3
+    
+    H1 -->|Response Status| B
+    H2 -->|Response Status| B
+    H3 -->|Response Status| B
+    
+    style P fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style B fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    style C fill:#e8f5e8,stroke:#388e3c,stroke-width:2px
+    style H1 fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style H2 fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style H3 fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style U fill:#fce4ec,stroke:#c2185b,stroke-width:2px
